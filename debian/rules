@@ -13,6 +13,13 @@ build:
 	$(MVN) package
 	dh build --remaining
 
+binary: build
+	dh binary --until dh_fixperms
+	dh_supervision -p condor --name condor
+	dh binary --after dh_fixperms
+
 clean:
 	dh clean
 	$(MVN) clean
+
+.PHONY: binary build

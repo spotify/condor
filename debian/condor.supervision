@@ -1,0 +1,5 @@
+{
+  "singles": [
+    ["java", "-jar", "/usr/share/condor/condor-1.0.jar"]
+  ]
+}
