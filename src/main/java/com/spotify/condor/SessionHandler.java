@@ -137,7 +137,7 @@ public class SessionHandler extends AbstractHandler {
 
         if (sessionTarget == null || shouldResetSession(pathInfo)) {
             sessionTarget = extractSessionTargetFromSymlink(pathInfo);
-            log.debug("Starting session {}:{}", sessionId, sessionTarget);
+            log.info("Starting session {}:{}", sessionId, sessionTarget);
             cache.put(sessionId, sessionTarget);
         } else {
             log.debug("Reusing session {}:{}", sessionId, sessionTarget);
