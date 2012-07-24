@@ -1,4 +1,0 @@
-<ehcache>
-    <cache name="sessions" maxElementsInMemory="10000" eternal="false" overflowToDisk="false" timeToIdleSeconds="0"
-           timeToLiveSeconds="3600" diskPersistent="false"/>
-</ehcache>

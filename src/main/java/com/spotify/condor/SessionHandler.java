@@ -6,9 +6,6 @@ import jregex.Matcher;
 import jregex.Pattern;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import net.sf.ehcache.CacheManager;
-import net.sf.ehcache.Ehcache;
-import net.sf.ehcache.Element;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -19,6 +16,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.net.BindException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Slf4j
 public class SessionHandler extends AbstractHandler {
@@ -29,11 +28,10 @@ public class SessionHandler extends AbstractHandler {
     final String id;
     final String accelRedirectPath;
     final String sessionTargetSymlink;
-
-    final Ehcache cache;
+    final Cache cache;
 
     SessionHandler(final Config cfg) {
-        cache = CacheManager.create().getCache("sessions");
+        cache = new Cache<SessionId, String>(cfg.getInt("cache_size"));
 
         pathInfoPattern = new Pattern(cfg.getString("match"));
         resetSessionPattern = new Pattern(cfg.getString("reset_on"));
@@ -50,6 +48,22 @@ public class SessionHandler extends AbstractHandler {
     static private class SessionId {
         final String clientId;
         final String pathId;
+    }
+
+    @Data
+    private class Cache<K,V> extends LinkedHashMap<K,V> {
+        private final int capacity;
+
+        public Cache(int capacity)
+        {
+            super(capacity + 1, 1.1f, true);
+            this.capacity = capacity;
+        }
+
+        @Override
+        protected boolean removeEldestEntry(Map.Entry eldest) {
+            return size() > capacity;
+        }
     }
 
     private static void fail(Request request, HttpServletResponse resp, int code, String message) throws IOException {
@@ -99,7 +113,6 @@ public class SessionHandler extends AbstractHandler {
 
     private String extractSessionTargetFromSymlink(final String pathInfo) throws IOException {
         final String path = pathInfoPattern.replacer(sessionTargetSymlink).replace(pathInfo);
-        log.debug("Looking up symlink {}", path);
 
         final File file = new File(path);
 
@@ -109,32 +122,24 @@ public class SessionHandler extends AbstractHandler {
         }
 
         final String canonicalPath = file.getCanonicalPath();
-        log.debug("Read value {} for symlink {}", canonicalPath, path);
-
         final Matcher matcher = sessionTargetPattern.matcher(canonicalPath);
-
         if (!matcher.matches())
             throw new IOException(String.format("Invalid symbolic link '%s'", path));
 
         final String sessionTarget = matcher.group(1);
-        log.debug("Extracted session target {} from symlink value {}", sessionTarget, canonicalPath);
 
         return sessionTarget;
     }
 
     private String getSessionTarget(String clientId, String pathId, String pathInfo) throws IOException {
         final SessionId sessionId = new SessionId(clientId, pathId);
-        final Element sessionElement = cache.get(sessionId);
-        final boolean noSessionAvailable = (sessionElement == null || sessionElement.getValue() == null);
+        String sessionTarget = (String) cache.get(sessionId);
 
-        final String sessionTarget;
-
-        if (noSessionAvailable || shouldResetSession(pathInfo)) {
+        if (sessionTarget == null || shouldResetSession(pathInfo)) {
             sessionTarget = extractSessionTargetFromSymlink(pathInfo);
             log.debug("Starting session {}:{}", sessionId, sessionTarget);
-            cache.put(new Element(sessionId, sessionTarget));
+            cache.put(sessionId, sessionTarget);
         } else {
-            sessionTarget = (String) sessionElement.getValue();
             log.debug("Reusing session {}:{}", sessionId, sessionTarget);
         }
 
