@@ -82,10 +82,14 @@ public class SessionHandler extends AbstractHandler {
             }
             final String tempPath = accelRedirectPath.replaceAll("\\$\\{session\\}", sessionTarget);
             forwardPath = pathInfoPattern.replacer(tempPath).replace(pathInfo);
+
+            httpServletResponse.setIntHeader("X-Accel-Expires", 0); /* no caching for repo metadata */
         }
         log.info("Sending {} to '{}'", clientId, forwardPath);
+
         httpServletResponse.setHeader("X-Accel-Redirect", forwardPath);
         httpServletResponse.setStatus(HttpServletResponse.SC_OK);
+
         request.setHandled(true);
     }
 
